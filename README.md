@@ -46,3 +46,27 @@ No modules.
 |------|-------------|
 | <a name="output_id"></a> [id](#output\_id) | The ID of the VPN Server Configuration. |
 <!-- END_TF_DOCS -->
+
+## Usage
+
+```hcl
+data "azurerm_client_config" "current" {
+}
+
+module "vpn_server_configuration" {
+  source = "github.com/fjdev/terraform-azurerm-vpn-server-configuration"
+
+  name                     = "example-vpnsc"
+  deploy_resource_group    = false
+  resource_group_name      = "example-rg"
+  location                 = "West Europe"
+  vpn_authentication_types = "AAD"
+  vpn_protocols            = ["OpenVPN"]
+
+  azure_active_directory_authentication = {
+    audience = "9674bbcc-2cf5-45e8-946e-533ab37360fd"
+    issuer   = "https://sts.windows.net/${data.azurerm_client_config.current.tenant_id}"
+    tenant   = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}"
+  }
+}
+```
