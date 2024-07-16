@@ -31,7 +31,7 @@ resource "azurerm_vpn_server_configuration" "vpnsc" {
   }
 
   vpn_protocols = var.vpn_protocols
-  tags          = try(var.tags.vpn_server_configuration, null)
+  tags          = var.deploy_resource_group ? try(var.tags.vpn_server_configuration, null) : var.tags
 
   dynamic "azure_active_directory_authentication" {
     for_each = var.vpn_authentication_types == "AAD" ? [var.azure_active_directory_authentication] : []
