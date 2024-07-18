@@ -1,3 +1,12 @@
+locals {
+  tags = {
+    Service          = "Azure VPN"
+    ManagedBy        = "Conclusion Enablement"
+    DeploymentMethod = "Terraform"
+    BillingSpec      = var.resource_group_name
+  }
+}
+
 # Resource Group
 resource "azurerm_resource_group" "rg" {
   count = var.deploy_resource_group ? 1 : 0
@@ -31,10 +40,10 @@ resource "azurerm_vpn_server_configuration" "vpnsc" {
   }
 
   vpn_protocols = var.vpn_protocols
-  tags          = var.deploy_resource_group ? try(var.tags.vpn_server_configuration, null) : var.tags
+  tags          = merge(var.deploy_resource_group ? try(var.tags.vpn_server_configuration, null) : var.tags, local.tags)
 
   dynamic "azure_active_directory_authentication" {
-    for_each = var.vpn_authentication_types == "AAD" ? [var.azure_active_directory_authentication] : []
+    for_each = contains(var.vpn_authentication_types, "AAD") ? [var.azure_active_directory_authentication] : []
 
     content {
       audience = azure_active_directory_authentication.value.audience
@@ -44,7 +53,7 @@ resource "azurerm_vpn_server_configuration" "vpnsc" {
   }
 
   dynamic "client_root_certificate" {
-    for_each = var.vpn_authentication_types == "Certificate" ? var.client_root_certificate : {}
+    for_each = contains(var.vpn_authentication_types, "Certificate") ? var.client_root_certificate : {}
 
     content {
       name             = client_root_certificate.key
@@ -53,7 +62,7 @@ resource "azurerm_vpn_server_configuration" "vpnsc" {
   }
 
   dynamic "client_revoked_certificate" {
-    for_each = var.vpn_authentication_types == "Certificate" && var.client_revoked_certificate != null ? var.client_revoked_certificate : {}
+    for_each = contains(var.vpn_authentication_types, "Certificate") && var.client_revoked_certificate != null ? var.client_revoked_certificate : {}
 
     content {
       name       = client_revoked_certificate.key
@@ -62,7 +71,7 @@ resource "azurerm_vpn_server_configuration" "vpnsc" {
   }
 
   dynamic "radius" {
-    for_each = var.vpn_authentication_types == "Radius" && var.radius != null ? [var.radius] : []
+    for_each = contains(var.vpn_authentication_types, "Radius") && var.radius != null ? [var.radius] : []
 
     content {
       dynamic "server" {
