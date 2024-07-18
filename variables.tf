@@ -11,6 +11,7 @@ variable "resource_group_name" {
 variable "location" {
   type        = string
   description = "(Required) The Azure location where this VPN Server Configuration should be created. Changing this forces a new resource to be created."
+  default     = "westeurope"
 }
 
 variable "vpn_authentication_types" {
