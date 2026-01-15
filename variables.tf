@@ -86,14 +86,14 @@ variable "radius" {
       public_cert_data = string
     })))
   })
-  description = "(Optional) A radius block as defined above."
   default     = null
+  description = "(Optional) A radius block as defined above."
 }
 
 variable "deploy_resource_group" {
   type        = bool
-  description = "(Optional) Specifies whether to deploy the resource group or not. Defaults to true."
   default     = true
+  description = "(Optional) Specifies whether to deploy the resource group or not. Defaults to true."
 }
 
 variable "managed_by" {
@@ -111,6 +111,6 @@ variable "policy_groups" {
     is_default = optional(bool)
     priority   = optional(number)
   }))
+  default     = {}
   description = "(Optional) One or more policy_groups blocks as defined above."
-  default     = null
 }
