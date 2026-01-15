@@ -7,7 +7,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -20,6 +20,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
@@ -30,14 +31,20 @@ jobs:
         run: terraform fmt -recursive .
 
       - name: Commit formatted files
+        if: github.event_name == 'pull_request'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          
+
+          if [ -z "${{ github.head_ref }}" ]; then
+            echo "::warning::Not on a pull request branch; skipping push"
+            exit 0
+          fi
+
           if [ -n "$(git status --porcelain)" ]; then
             git add -A
             git commit -m "style: format terraform files"
-            git push
+            git push origin HEAD:${{ github.head_ref }}
             echo "::notice::Terraform files formatted and committed"
           else
             echo "::notice::Terraform files are already properly formatted"
@@ -118,11 +125,29 @@ jobs:
     steps:
       - name: Check test results
         run: |
-          if [ "${{ needs.terraform-format.result }}" == "failure" ] || \
-             [ "${{ needs.terraform-validate.result }}" == "failure" ] || \
-             [ "${{ needs.documentation.result }}" == "failure" ]; then
-            echo "::error::One or more tests failed"
+          fmt="${{ needs.terraform-format.result }}"
+          validate="${{ needs.terraform-validate.result }}"
+          docs="${{ needs.documentation.result }}"
+
+          failed=0
+
+          if [ "$fmt" != "success" ]; then
+            echo "::error::terraform fmt did not succeed (result: $fmt)"
+            failed=1
+          fi
+
+          if [ "$validate" != "success" ]; then
+            echo "::error::terraform validate did not succeed (result: $validate)"
+            failed=1
+          fi
+
+          if [ "$docs" != "success" ]; then
+            echo "::error::documentation check did not succeed (result: $docs)"
+            failed=1
+          fi
+
+          if [ $failed -eq 1 ]; then
             exit 1
           else
-            echo "::notice::All Terraform validation tests passed!"
+            echo "::notice::All Terraform checks succeeded (fmt, validate, documentation)"
           fi
