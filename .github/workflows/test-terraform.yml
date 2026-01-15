@@ -1,0 +1,176 @@
+name: 'Test: Terraform Validation'
+
+on:
+  pull_request:
+    paths:
+      - '**.tf'
+      - '**.tfvars'
+      - '.github/workflows/test-terraform.yml'
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  terraform-format:
+    name: Terraform Format Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: latest
+
+      - name: Check Terraform formatting
+        run: |
+          if terraform fmt -check -recursive .; then
+            echo "::notice::Terraform formatting is correct"
+          else
+            echo "::error::Terraform files are not formatted correctly. Run 'terraform fmt -recursive .' locally"
+            exit 1
+          fi
+
+  terraform-validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: latest
+
+      - name: Initialize Terraform
+        run: |
+          terraform init -backend=false
+          echo "::notice::Terraform initialized (backend disabled)"
+
+      - name: Validate Terraform configuration
+        run: |
+          terraform validate
+          echo "::notice::Terraform configuration is valid"
+
+  tflint:
+    name: TFLint Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache TFLint plugins
+        uses: actions/cache@v3
+        with:
+          path: ~/.tflint.d/plugins
+          key: ${{ runner.os }}-tflint-${{ hashFiles('.tflint.hcl') }}
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v3
+        with:
+          tflint_version: latest
+
+      - name: Initialize TFLint
+        run: tflint --init
+
+      - name: Run TFLint
+        run: |
+          if tflint --format compact; then
+            echo "::notice::TFLint checks passed"
+          else
+            echo "::error::TFLint found issues"
+            exit 1
+          fi
+
+  tfsec:
+    name: TFSec Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run TFSec
+        uses: aquasecurity/tfsec-action@v1
+        with:
+          working_directory: '.'
+          format: 'sarif'
+          out_dir: '.'
+
+      - name: Upload TFSec results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: tfsec.sarif
+
+  documentation:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for README
+        run: |
+          if [ -f "README.md" ]; then
+            echo "::notice::README.md found"
+          else
+            echo "::error::README.md is missing"
+            exit 1
+          fi
+
+      - name: Check for main.tf
+        run: |
+          if [ -f "main.tf" ]; then
+            echo "::notice::main.tf found"
+          else
+            echo "::error::main.tf is missing"
+            exit 1
+          fi
+
+      - name: Check for variables.tf
+        run: |
+          if [ -f "variables.tf" ]; then
+            echo "::notice::variables.tf found"
+          else
+            echo "::error::variables.tf is missing"
+            exit 1
+          fi
+
+      - name: Check for outputs.tf
+        run: |
+          if [ -f "outputs.tf" ]; then
+            echo "::notice::outputs.tf found"
+          else
+            echo "::warning::outputs.tf is missing (recommended)"
+          fi
+
+  summary:
+    name: Test Summary
+    needs: [terraform-format, terraform-validate, tflint, tfsec, documentation]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.terraform-format.result }}" == "failure" ] || \
+             [ "${{ needs.terraform-validate.result }}" == "failure" ] || \
+             [ "${{ needs.tflint.result }}" == "failure" ] || \
+             [ "${{ needs.tfsec.result }}" == "failure" ] || \
+             [ "${{ needs.documentation.result }}" == "failure" ]; then
+            echo "::error::One or more tests failed"
+            exit 1
+          else
+            echo "::notice::All Terraform validation tests passed!"
+          fi
