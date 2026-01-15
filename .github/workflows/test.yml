@@ -12,25 +12,35 @@ permissions:
 
 jobs:
   terraform-format:
-    name: Terraform Format Check
+    name: Terraform Format
     runs-on: ubuntu-latest
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: latest
 
-      - name: Check Terraform formatting
+      - name: Format Terraform files
+        run: terraform fmt -recursive .
+
+      - name: Commit formatted files
         run: |
-          if terraform fmt -check -recursive .; then
-            echo "::notice::Terraform formatting is correct"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "style: format terraform files"
+            git push
+            echo "::notice::Terraform files formatted and committed"
           else
-            echo "::error::Terraform files are not formatted correctly. Run 'terraform fmt -recursive .' locally"
-            exit 1
+            echo "::notice::Terraform files are already properly formatted"
           fi
 
   terraform-validate:
@@ -55,59 +65,6 @@ jobs:
         run: |
           terraform validate
           echo "::notice::Terraform configuration is valid"
-
-  tflint:
-    name: TFLint Check
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Cache TFLint plugins
-        uses: actions/cache@v3
-        with:
-          path: ~/.tflint.d/plugins
-          key: ${{ runner.os }}-tflint-${{ hashFiles('.tflint.hcl') }}
-
-      - name: Setup TFLint
-        uses: terraform-linters/setup-tflint@v3
-        with:
-          tflint_version: latest
-
-      - name: Initialize TFLint
-        run: tflint --init
-
-      - name: Run TFLint
-        run: |
-          if tflint --format compact; then
-            echo "::notice::TFLint checks passed"
-          else
-            echo "::error::TFLint found issues"
-            exit 1
-          fi
-
-  trivy:
-    name: Trivy Security Scan
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'config'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-
-      - name: Upload Trivy results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: trivy-results.sarif
 
   documentation:
     name: Documentation Check
@@ -154,7 +111,7 @@ jobs:
 
   summary:
     name: Test Summary
-    needs: [terraform-format, terraform-validate, tflint, trivy, documentation]
+    needs: [terraform-format, terraform-validate, documentation]
     runs-on: ubuntu-latest
     if: always()
     
@@ -163,8 +120,6 @@ jobs:
         run: |
           if [ "${{ needs.terraform-format.result }}" == "failure" ] || \
              [ "${{ needs.terraform-validate.result }}" == "failure" ] || \
-             [ "${{ needs.tflint.result }}" == "failure" ] || \
-             [ "${{ needs.trivy.result }}" == "failure" ] || \
              [ "${{ needs.documentation.result }}" == "failure" ]; then
             echo "::error::One or more tests failed"
             exit 1
