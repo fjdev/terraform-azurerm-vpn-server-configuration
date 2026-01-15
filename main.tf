@@ -104,9 +104,9 @@ resource "azurerm_vpn_server_configuration_policy_group" "vpnscpg" {
     for_each = each.value.policies
 
     content {
-        name  = policy.key
+      name  = policy.key
       type  = policy.value.type
-    value = policy.value.value
+      value = policy.value.value
     }
   }
 
