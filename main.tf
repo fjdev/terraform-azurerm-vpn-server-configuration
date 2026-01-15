@@ -8,7 +8,7 @@ resource "azurerm_resource_group" "rg" {
 }
 
 resource "azurerm_vpn_server_configuration" "vpnsc" {
-  name                     = var.name
+    name                     = var.name
   resource_group_name      = var.deploy_resource_group ? azurerm_resource_group.rg[0].name : var.resource_group_name
   location                 = var.location
   vpn_authentication_types = var.vpn_authentication_types
@@ -17,10 +17,10 @@ resource "azurerm_vpn_server_configuration" "vpnsc" {
     for_each = var.ipsec_policy != null ? [var.ipsec_policy] : []
 
     content {
-      dh_group               = ipsec_policy.value.dh_group
-      ike_encryption         = ipsec_policy.value.ike_encryption
+            dh_group               = ipsec_policy.value.dh_group
+        ike_encryption         = ipsec_policy.value.ike_encryption
       ike_integrity          = ipsec_policy.value.ike_integrity
-      ipsec_encryption       = ipsec_policy.value.ipsec_encryption
+      ipsec_encryption       =    ipsec_policy.value.ipsec_encryption
       ipsec_integrity        = ipsec_policy.value.ipsec_integrity
       pfs_group              = ipsec_policy.value.pfs_group
       sa_lifetime_seconds    = ipsec_policy.value.sa_lifetime_seconds
