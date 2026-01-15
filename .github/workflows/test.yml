@@ -1,4 +1,4 @@
-name: 'Test: Terraform Validation'
+name: 'Test: Run Terraform Validation'
 
 on:
   pull_request:
@@ -154,7 +154,7 @@ jobs:
 
   summary:
     name: Test Summary
-    needs: [terraform-format, terraform-validate, tflint, tfsec, documentation]
+    needs: [terraform-format, terraform-validate, tflint, trivy, documentation]
     runs-on: ubuntu-latest
     if: always()
     
@@ -164,7 +164,7 @@ jobs:
           if [ "${{ needs.terraform-format.result }}" == "failure" ] || \
              [ "${{ needs.terraform-validate.result }}" == "failure" ] || \
              [ "${{ needs.tflint.result }}" == "failure" ] || \
-             [ "${{ needs.tfsec.result }}" == "failure" ] || \
+             [ "${{ needs.trivy.result }}" == "failure" ] || \
              [ "${{ needs.documentation.result }}" == "failure" ]; then
             echo "::error::One or more tests failed"
             exit 1
