@@ -112,5 +112,5 @@ variable "policy_groups" {
     priority   = optional(number)
   }))
   description = "(Optional) One or more policy_groups blocks as defined above."
-  default     = {}
+  default     = null
 }
