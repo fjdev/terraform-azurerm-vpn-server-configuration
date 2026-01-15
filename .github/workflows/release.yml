@@ -20,7 +20,7 @@ jobs:
           LABELS="${{ join(github.event.pull_request.labels.*.name, ' ') }}"
           
           if [[ ! "$LABELS" =~ release:(major|minor|patch) ]]; then
-            echo "❌ PR must have one of these labels: release:major, release:minor, or release:patch"
+            echo "❌ PR must have one of these labels: `release:major`, `release:minor`, or `release:patch`"
             exit 1
           fi
           echo "✅ Valid release label found"
@@ -102,12 +102,8 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               tag_name: 'v${{ steps.new-version.outputs.new-version }}',
-              name: 'Release v${{ steps.new-version.outputs.new-version }}',
-              body: `Release Type: \`${{ steps.release-type.outputs.release-type }}\`
-            Previous Version: \`v${{ steps.current-version.outputs.current-version }}\`
-            
-            **PR**: ${{ github.event.pull_request.html_url }}
-            **Merged by**: @${{ github.event.pull_request.user.login }}`,
+              name: 'v${{ steps.new-version.outputs.new-version }}',
               draft: false,
-              prerelease: false
+              prerelease: false,
+              generate_release_notes: true
             })
