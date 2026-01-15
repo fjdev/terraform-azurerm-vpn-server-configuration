@@ -2,13 +2,9 @@ name: 'Test: Terraform Validation'
 
 on:
   pull_request:
-    paths:
-      - '**.tf'
-      - '**.tfvars'
-      - '.github/workflows/test-terraform.yml'
+    types: [opened, reopened, labeled, unlabeled, synchronize]
     branches:
       - main
-      - develop
 
 permissions:
   contents: read
