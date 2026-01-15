@@ -1,4 +1,4 @@
-name: Release: Create Semantic Version
+name: 'Release: Create Semantic Version'
 
 on:
   pull_request:
