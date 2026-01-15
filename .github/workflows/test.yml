@@ -109,6 +109,61 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
 
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: latest
+
+      - name: Initialize Terraform
+        run: terraform init -backend=false
+
+      - name: Run Terraform Plan
+        id: plan
+        run: |
+          terraform plan -no-color -out=tfplan
+          terraform show -no-color tfplan > plan.txt
+        continue-on-error: true
+
+      - name: Post Plan to PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('plan.txt', 'utf8');
+            const maxLength = 65000;
+            const truncatedPlan = plan.length > maxLength ? plan.substring(0, maxLength) + '\n\n... (truncated)' : plan;
+            
+            const output = `#### Terraform Plan 📖
+            <details><summary>Show Plan</summary>
+            
+            \`\`\`terraform
+            ${truncatedPlan}
+            \`\`\`
+            
+            </details>
+            
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+      - name: Check Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
   documentation:
     name: Documentation Check
     runs-on: ubuntu-latest
@@ -154,7 +209,7 @@ jobs:
 
   summary:
     name: Test Summary
-    needs: [terraform-format, terraform-validate, tflint, trivy, documentation]
+    needs: [terraform-format, terraform-validate, tflint, trivy, terraform-plan, documentation]
     runs-on: ubuntu-latest
     if: always()
     
@@ -165,6 +220,7 @@ jobs:
              [ "${{ needs.terraform-validate.result }}" == "failure" ] || \
              [ "${{ needs.tflint.result }}" == "failure" ] || \
              [ "${{ needs.trivy.result }}" == "failure" ] || \
+             [ "${{ needs.terraform-plan.result }}" == "failure" ] || \
              [ "${{ needs.documentation.result }}" == "failure" ]; then
             echo "::error::One or more tests failed"
             exit 1
