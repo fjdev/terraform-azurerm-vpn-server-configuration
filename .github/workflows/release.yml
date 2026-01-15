@@ -1,0 +1,113 @@
+name: Semantic Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  validate-release-label:
+    if: github.event.pull_request.merged == false
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check for release label
+        run: |
+          LABELS="${{ join(github.event.pull_request.labels.*.name, ' ') }}"
+          
+          if [[ ! "$LABELS" =~ release:(major|minor|patch) ]]; then
+            echo "❌ PR must have one of these labels: release:major, release:minor, or release:patch"
+            exit 1
+          fi
+          echo "✅ Valid release label found"
+
+  release:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine release type
+        id: release-type
+        run: |
+          LABELS="${{ join(github.event.pull_request.labels.*.name, ' ') }}"
+          RELEASE_TYPE=""
+          
+          if [[ "$LABELS" =~ release:major ]]; then
+            RELEASE_TYPE="major"
+          elif [[ "$LABELS" =~ release:minor ]]; then
+            RELEASE_TYPE="minor"
+          elif [[ "$LABELS" =~ release:patch ]]; then
+            RELEASE_TYPE="patch"
+          fi
+          
+          echo "release-type=$RELEASE_TYPE" >> $GITHUB_OUTPUT
+
+      - name: Get current version
+        id: current-version
+        run: |
+          LATEST_TAG=$(git tag -l 'v*' --sort=-version:refname | head -n 1)
+          VERSION=${LATEST_TAG#v}
+          VERSION=${VERSION:-0.0.0}
+          echo "current-version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Calculate new version
+        id: new-version
+        run: |
+          RELEASE_TYPE="${{ steps.release-type.outputs.release-type }}"
+          
+          if [ -z "$RELEASE_TYPE" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          CURRENT="${{ steps.current-version.outputs.current-version }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          
+          case "$RELEASE_TYPE" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+          
+          echo "new-version=$MAJOR.$MINOR.$PATCH" >> $GITHUB_OUTPUT
+
+      - name: Set up Git
+        if: steps.new-version.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create and push git tag
+        if: steps.new-version.outputs.skip != 'true'
+        run: |
+          TAG="v${{ steps.new-version.outputs.new-version }}"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+      - name: Create GitHub Release
+        if: steps.new-version.outputs.skip != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: 'v${{ steps.new-version.outputs.new-version }}',
+              name: 'Release v${{ steps.new-version.outputs.new-version }}',
+              body: `Release Type: \`${{ steps.release-type.outputs.release-type }}\`
+            Previous Version: \`v${{ steps.current-version.outputs.current-version }}\`
+            
+            **PR**: ${{ github.event.pull_request.html_url }}
+            **Merged by**: @${{ github.event.pull_request.user.login }}`,
+              draft: false,
+              prerelease: false
+            })
