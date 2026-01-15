@@ -4,7 +4,7 @@ resource "azurerm_resource_group" "rg" {
   name       = var.resource_group_name
   location   = var.location
   managed_by = var.managed_by
-  tags       =    try(var.tags.resource_group, null)
+  tags       = try(var.tags.resource_group, null)
 }
 
 resource "azurerm_vpn_server_configuration" "vpnsc" {
@@ -97,14 +97,14 @@ resource "azurerm_vpn_server_configuration" "vpnsc" {
 resource "azurerm_vpn_server_configuration_policy_group" "vpnscpg" {
   for_each = var.policy_groups != null ? var.policy_groups : {}
 
-  name      = each.key
+  name                        = each.key
   vpn_server_configuration_id = azurerm_vpn_server_configuration.vpnsc.id
 
   dynamic "policy" {
     for_each = each.value.policies
 
     content {
-                      name  = policy.key
+      name  = policy.key
       type  = policy.value.type
       value = policy.value.value
     }
